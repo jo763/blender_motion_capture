@@ -3,8 +3,14 @@ import cv2
 import bpy
 import mathutils
 import time
-# Test
+global qwerty 
+qwerty= True
+global camera_arm_length
+
 def arm_angle_finder(shoulder, hand):
+    """
+    Finds the tangent angles from two points in space using the x-y plane and the y-z plane
+    """
     x1, y1, z1 = shoulder
     x2, y2, z2 = hand
     tanA = abs((x1-x2)/(y1-y2))
@@ -12,23 +18,43 @@ def arm_angle_finder(shoulder, hand):
     return tanA, tanB
 
 def length_between_points(point1, point2):
+    """
+    Finds the length between two 3D points
+    Takes two lists as inputs and returns a distance 
+    """
     x1, y1, z1 = point1[0], point1[1], point1[2]
     x2, y2, z2 = point2[0], point2[1], point2[2]
     distance = (((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)**0.5)
     return distance
 
 def arm_length_calc(shoulder, elbow, hand):
-    upper_arm = length_between_points(shoulder, elbow)
-    forearm = length_between_points(elbow, hand)
-    upper_arm = 0.14527815580368042
+    """
+    Finds the length of the upper forearm, using the coordinates for the shoulder and elbow
+    """
+    try:
+        upper_arm = length_between_points(shoulder, elbow)
+        #forearm = length_between_points(elbow, hand)
+    except:
+        upper_arm = 0.14527815580368042
     return upper_arm
 
 def model_dimension_length_calc(shoulder, head):
     pass
 
+
 def get_arm_model_coords(cam_shoulder, cam_elbow, cam_hand, model_shoulder, model_hand, model_elbow):
-    camera_arm_length = arm_length_calc(cam_shoulder, cam_elbow, cam_hand)
-    model_arm_length = arm_length_calc(model_shoulder, model_elbow, model_hand)
+    # The length of the upper arm in the motion capture (fractions of the screen)
+    global qwerty
+    global camera_arm_length
+    print(qwerty)
+    while qwerty:
+        camera_arm_length = arm_length_calc(cam_shoulder, cam_elbow, cam_hand)
+        print("THIS SHOULD EXIST\n\n\nTHIS SHOULD EXIST\n\n\nTHIS SHOULD EXIST\n\n\nTHIS SHOULD EXIST\n\n\n")
+        if round(camera_arm_length,3) != 0.145:
+            break
+    qwerty = False
+    # The length of the upper arm in the simulation (local units)
+    model_arm_length = 0.14527815580368042 # arm_length_calc(model_shoulder, model_elbow, model_hand)
     try:
         scale_factor = model_arm_length/camera_arm_length
         #print("=" *30)
@@ -42,13 +68,14 @@ def get_arm_model_coords(cam_shoulder, cam_elbow, cam_hand, model_shoulder, mode
         scale_factor = 0.25
         #print("=" *30)
         #print("Issue calculating scale factor")
+    print(f"Scale factor is {scale_factor})")
     x1, y1, z1 = cam_shoulder[0], cam_shoulder[1], cam_shoulder[2]
     x2, y2, z2 = cam_hand[0], cam_hand[1], cam_hand[2]
     x3, y3, z3 = model_shoulder[0], model_shoulder[1], model_shoulder[2]
-    x4 =  ((x2-x1) * scale_factor)
-    y4 =  ((y1-y2) * scale_factor)
-    z4 =  ((z1-z2) * scale_factor)
-    z4 = 0
+    x4 = x3 + ((x2-x1) * scale_factor)
+    y4 = y3 + ((y1-y2) * scale_factor)
+    z4 = ((z1-z2) * scale_factor)
+    #z4 = 0
     return [x4, -.5-y4, .1+z4]
 
 def get_hand_coords(cam_hand, model_hand, cam_finger_tips, model_finger_tips):
@@ -64,10 +91,10 @@ def get_hand_coords(cam_hand, model_hand, cam_finger_tips, model_finger_tips):
 
             #model_finger_tip_coords = extract_values(landmarks[mp_holistic.PoseLandmark.LEFT_WRIST.value], 0)
             model_finger_tip_coords = extract_values(bpy.data.objects['Armature'].pose.bones[model_finger_tip].location, 0)
-            print(f"Model body part: {model_finger_tip}, coords: {model_finger_tip_coords}")
-
             cam_finger_tip_coords = results.left_hand_landmarks.landmark[cam_finger_tip]
-            print(f"Camera body part: {cam_hand_tips_points_desc[i]}, Mediapipe Index: {cam_finger_tip}, coords: {cam_finger_tip_coords}")
+
+            #print(f"Model body part: {model_finger_tip}, coords: {model_finger_tip_coords}")
+            #print(f"Camera body part: {cam_hand_tips_points_desc[i]}, Mediapipe Index: {cam_finger_tip}, coords: {cam_finger_tip_coords}")
 
         except:
             pass
@@ -122,10 +149,12 @@ with mp_holistic.Holistic(min_detection_confidence = 0.5, min_tracking_confidenc
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         
         # Extract landmarks
+        
         try:
             landmarks = results.pose_landmarks.landmark
             #landmarks = results.pose_world_landmarks.landmark
         except:
+            # Justs ends the code if person falls out of the camera screen
             print("\n============================")
             print("Landmarks tryblock failed")
             print("Rerun program")
@@ -167,9 +196,9 @@ with mp_holistic.Holistic(min_detection_confidence = 0.5, min_tracking_confidenc
         get_hand_coords(cam_hand, model_hand, cam_hand_tips_points ,model_hand_tips_L)
         
         # draw face landmarks
-        mp_drawing.draw_landmarks(image, results.face_landmarks, mp_holistic.FACEMESH_TESSELATION,
-        mp_drawing.DrawingSpec(color=(0,0,255), thickness=1, circle_radius = 1),
-        mp_drawing.DrawingSpec(color=(0,0,255), thickness=1, circle_radius = 1))
+        #mp_drawing.draw_landmarks(image, results.face_landmarks, mp_holistic.FACEMESH_TESSELATION,
+        #mp_drawing.DrawingSpec(color=(0,0,255), thickness=1, circle_radius = 1),
+        #mp_drawing.DrawingSpec(color=(0,0,255), thickness=1, circle_radius = 1))
 
         # right handq
         mp_drawing.draw_landmarks(image, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS,
@@ -186,15 +215,7 @@ with mp_holistic.Holistic(min_detection_confidence = 0.5, min_tracking_confidenc
         mp_drawing.DrawingSpec(color=(0,0,0), thickness=2, circle_radius = 2),
         mp_drawing.DrawingSpec(color=(255,255,255), thickness=2, circle_radius = 4))
         
-        
-        # ========================
-        
-        
 
-        
-        #==================================
-        
-        
         
         cv2.imshow("Holistic Model Detection", cv2.flip(image, 1))
         boxNewCoord = landmarks[mp_holistic.PoseLandmark.LEFT_WRIST.value].x
